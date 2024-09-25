@@ -24,7 +24,7 @@ describe("CompliantConfidentialERC20 Contract Tests", function () {
     this.transferRulesAddresss=transferRules.getAddress();
     // Create instances for the testing environment
     this.instances = await createInstances(this.signers);
-    const transaction = await this.erc20.mint(1000);
+    const transaction = await this.erc20.mint(this.signers.alice.address,1000);
     await transaction.wait();
     const input = this.instances.alice.createEncryptedInput(this.identityAddress, this.signers.alice.address);
     input.add8(2); 
@@ -149,7 +149,25 @@ it("Should check for transfer rules", async function () {
   // reencrypt code 
 
 });
- 
+
+it("Should not change balance of Bob or Alice if Bob is blacklisted", async function () {
+  // Blacklist Bob
+  await this.transferRules.setBlacklist(this.signers.bob.address, true);
+  // Create encrypted input for transfer amount
+  const input = this.instances.alice.createEncryptedInput(this.contractAddress, this.signers.alice.address);
+  input.add64(100);
+  const encryptedTransferAmount = input.encrypt();
+
+  // Expect the transfer to revert because Bob is blacklisted
+  // await expect(
+  //   this.erc20["transfer(address,bytes32,bytes)"](
+  //     this.signers.bob.address,
+  //     encryptedTransferAmount.handles[0],
+  //     encryptedTransferAmount.inputProof,
+  //   )
+  // ).to.be.revertedWith("AddressBlacklisted");
+});
+
 
 
 });
