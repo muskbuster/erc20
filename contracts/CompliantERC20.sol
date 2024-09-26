@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
-import "./EncryptedERC20.sol";
+import "./ConfidentialERC20.sol";
 import "./Identity.sol";
 import "./TransferRules.sol";
-contract CompliantConfidentialERC20 is EncryptedERC20 {
+contract CompliantConfidentialERC20 is ConfidentialERC20 {
     Identity public identityContract;
     TransferRules public transferRulesContract;
 
     constructor(string memory name_, string memory symbol_, address _identityContract, address _transferRulesContract) 
-        EncryptedERC20(name_, symbol_) 
+    ConfidentialERC20(name_, symbol_) 
     {
        address owner = msg.sender;
         identityContract = Identity(_identityContract);

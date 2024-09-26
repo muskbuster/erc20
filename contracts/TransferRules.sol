@@ -3,8 +3,9 @@ pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
 import "./Identity.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-contract TransferRules {
+contract TransferRules is Ownable2Step {
     Identity public immutable identityContract;
     
     uint64 public constant transferLimit=(20000 * 10**6);
@@ -17,7 +18,7 @@ contract TransferRules {
     event BlacklistUpdated(address indexed user, bool isBlacklisted);
     error AddressBlacklisted(address  user);
 
-    constructor(address _identityContract) {
+    constructor(address _identityContract) Ownable(msg.sender) {
         identityContract = Identity(_identityContract);
     }
     
@@ -71,7 +72,7 @@ contract TransferRules {
         return mintAllowed;
     }
 
-    function setBlacklist(address user, bool isBlacklisted) external {
+    function setBlacklist(address user, bool isBlacklisted) onlyOwner() external {
         require(user != address(0), "Invalid address");
         userBlocklist[user] = isBlacklisted;
         emit BlacklistUpdated(user, isBlacklisted);

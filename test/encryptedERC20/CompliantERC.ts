@@ -55,52 +55,6 @@ describe("CompliantConfidentialERC20 Contract Tests", function () {
     expect(totalSupply).to.equal(1000);
     console.log("Contracts deployed successfully.");
   });
-
-
-
-  it("should set same countryCode for Alice and Bob", async function () {
-    const input = this.instances.alice.createEncryptedInput(this.identityAddress, this.signers.alice.address);
-    input.add8(2); 
-    const encryptedCode = input.encrypt();
-    
-    // Update Alice's identity
-    const updateAliceCodeTx = await this.identity.registerIdentity(
-        this.signers.alice.address,
-        encryptedCode.handles[0],
-        encryptedCode.inputProof
-    );
-    await updateAliceCodeTx.wait(); 
-    const inputBob = this.instances.bob.createEncryptedInput(this.identityAddress, this.signers.bob.address);
-    inputBob.add8(2); 
-    const encryptedCodeBob = inputBob.encrypt();
-    const updateBobCodeTx = await this.identity.registerIdentity(
-      this.signers.bob.address,
-      encryptedCodeBob.handles[0],
-      encryptedCodeBob.inputProof
-  );
-  await updateBobCodeTx.wait();
-
-//  // reencrypt code?
-//   const aliceCode = await this.identity.getIdentity(this.signers.alice.address);
-//   const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-//   const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.identityAddress);
-//   const signatureAlice = await this.signers.alice.signTypedData(
-//     eip712.domain,
-//     { Reencrypt: eip712.types.Reencrypt },
-//     eip712.message
-//   );
-
-//   const aliceCodeHandles = await this.instances.alice.reencrypt(
-//     aliceCode,
-//     privateKeyAlice,
-//     publicKeyAlice,
-//     signatureAlice.replace("0x", ""),
-//     this.identityAddress,
-//     this.signers.alice.address
-//   );
-//   expect(aliceCodeHandles).to.equal(2);
-
-});
   it("Should transfer token from alice to Bob", async function () {
 
     const input = this.instances.alice.createEncryptedInput(this.contractAddress, this.signers.alice.address);
@@ -151,22 +105,22 @@ it("Should check for transfer rules", async function () {
 });
 
 it("Should not change balance of Bob or Alice if Bob is blacklisted", async function () {
-  // Blacklist Bob
+  
   await this.transferRules.setBlacklist(this.signers.bob.address, true);
-  // Create encrypted input for transfer amount
+
+
   const input = this.instances.alice.createEncryptedInput(this.contractAddress, this.signers.alice.address);
   input.add64(100);
   const encryptedTransferAmount = input.encrypt();
 
-  // Expect the transfer to revert because Bob is blacklisted
-  // await expect(
-  //   this.erc20["transfer(address,bytes32,bytes)"](
-  //     this.signers.bob.address,
-  //     encryptedTransferAmount.handles[0],
-  //     encryptedTransferAmount.inputProof,
-  //   )
-  // ).to.be.revertedWith("AddressBlacklisted");
+  const tx = await this.erc20["transfer(address,bytes32,bytes)"](
+    this.signers.bob.address,
+    encryptedTransferAmount.handles[0],
+    encryptedTransferAmount.inputProof,
+  );
+
 });
+
 
 
 

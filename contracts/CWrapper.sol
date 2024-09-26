@@ -3,15 +3,12 @@ pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
 import "fhevm/gateway/GatewayCaller.sol";
-import "contracts/EncryptedERC20.sol";
+import "contracts/ConfidentialERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "contracts/CompliantERC20.sol";
 
-contract ConfidentialERC20Wrapper is EncryptedERC20, GatewayCaller {
-    using SafeERC20 for IERC20;
-
-    IERC20 public immutable baseERC20;
+contract ConfidentialERC20Wrapper is ConfidentialERC20, GatewayCaller {
+    IERC20 public baseERC20;
     mapping(address => bool) public unwrapDisabled;
     mapping(uint256 => BurnRequest) public burnRequests;
     uint256 counter;
@@ -26,13 +23,16 @@ contract ConfidentialERC20Wrapper is EncryptedERC20, GatewayCaller {
 
     error UnwrapNotAllowed(address account);
 
-    constructor(address _baseERC20) EncryptedERC20("Wrapped cERC20", "wcERC20") {
+    constructor(address _baseERC20) ConfidentialERC20("Wrapped cERC20", "wcERC20") {
         baseERC20 = IERC20(_baseERC20);
     }
 
     function wrap(uint64 amount) external {
-        baseERC20.safeTransferFrom(msg.sender, address(this), amount);
-        mint(msg.sender, uint64(amount));
+        uint256 _amount = uint256(amount);
+        uint256 allowance = baseERC20.allowance(msg.sender, address(this));
+        require(allowance >= _amount, "Not enough allowance");
+        baseERC20.transferFrom(msg.sender, address(this),_amount);
+        _mint(msg.sender, uint64(amount));
         emit Wrap(msg.sender, amount);
     }
 
@@ -70,14 +70,13 @@ contract ConfidentialERC20Wrapper is EncryptedERC20, GatewayCaller {
         if (!decryptedInput) {
             revert("Decryption failed");
         }
-
-        _totalSupply = _totalSupply - amount;
+        _totalSupply=_totalSupply-amount;
         balances[account] = TFHE.sub(balances[account], amount);
         TFHE.allow(balances[account], address(this));
         TFHE.allow(balances[account], account);
         emit Burn(account, amount);
 
-        baseERC20.safeTransfer(account, amount);
+        baseERC20.transfer(account, amount);
         emit Unwrap(account, amount);
 
         // Clean up the burn request after handling it

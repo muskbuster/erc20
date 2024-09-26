@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import "fhevm/lib/TFHE.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-contract EncryptedERC20 is Ownable2Step {
+contract ConfidentialERC20 is Ownable2Step {
     event Transfer(address indexed from, address indexed to);
     event Approval(address indexed owner, address indexed spender);
     event Mint(address indexed to, uint64 amount);
@@ -42,7 +42,14 @@ contract EncryptedERC20 is Ownable2Step {
     }
 
     // Sets the balance of the owner to the given encrypted balance.
-    function mint(address user,uint64 mintedAmount) public virtual onlyOwner {
+    function _mint(address user,uint64 mintedAmount) internal virtual  {
+        balances[user] = TFHE.add(balances[user], mintedAmount); // overflow impossible because of next line
+        TFHE.allow(balances[user], address(this));
+        TFHE.allow(balances[user], owner());
+        _totalSupply = _totalSupply + mintedAmount;
+        emit Mint(user, mintedAmount);
+    }
+    function mint(address user,uint64 mintedAmount) public virtual onlyOwner()  {
         balances[user] = TFHE.add(balances[user], mintedAmount); // overflow impossible because of next line
         TFHE.allow(balances[user], address(this));
         TFHE.allow(balances[user], owner());
