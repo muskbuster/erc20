@@ -3,12 +3,11 @@ pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
 import "fhevm/gateway/GatewayCaller.sol";
-import "contracts/EncryptedERC20.sol";
+import "contracts/ConfidentialERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "contracts/CompliantERC20.sol";
 
-contract ConfidentialERC20Wrapper is EncryptedERC20, GatewayCaller {
+contract ConfidentialERC20Wrapper is ConfidentialERC20, GatewayCaller {
     IERC20 public baseERC20;
     mapping(address => bool) public unwrapDisabled;
     mapping(uint256 => BurnRequest) public burnRequests;
@@ -24,7 +23,7 @@ contract ConfidentialERC20Wrapper is EncryptedERC20, GatewayCaller {
 
     error UnwrapNotAllowed(address account);
 
-    constructor(address _baseERC20) EncryptedERC20("Wrapped cERC20", "wcERC20") {
+    constructor(address _baseERC20) ConfidentialERC20("Wrapped cERC20", "wcERC20") {
         baseERC20 = IERC20(_baseERC20);
     }
 
