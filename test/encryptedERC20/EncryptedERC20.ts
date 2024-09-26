@@ -1,259 +1,129 @@
-// import { expect } from "chai";
 
-// import { createInstances } from "../instance";
-// import { getSigners, initSigners } from "../signers";
-// import { deployEncryptedERC20Fixture } from "./EncryptedERC20.fixture";
+import { expect } from "chai";
+import { createInstances } from "../instance";
+import { getSigners, initSigners } from "../signers";
+import { deployEncryptedERC20Fixture } from "./ConfidentialWrapper.fixture";
+import { awaitAllDecryptionResults } from "../asyncDecrypt";
+import { erc20 } from "../../types/@openzeppelin/contracts/token";
+import { decrypt } from "dotenv";
+describe("ConfidentialERC20Wrapper - Wrap Functionality", function () {
+  before(async function () {
+    await initSigners();
+    this.signers = await getSigners();
+  });
 
-// describe("EncryptedERC20", function () {
-//   before(async function () {
-//     await initSigners();
-//     this.signers = await getSigners();
-//   });
+  beforeEach(async function () {
+    const { contract, erc20 } = await deployEncryptedERC20Fixture();
+    this.wrapperContract = contract;  // The ConfidentialERC20Wrapper contract
+    this.normalERC = erc20;           // The base ERC20 contract (normal ERC20)
+    this.wrapperAddress = await this.wrapperContract.getAddress();  // Wrapper contract address
+    this.instances = await createInstances(this.signers); // Create encryption instances for signers
+  });
 
-//   beforeEach(async function () {
-//     const contract = await deployEncryptedERC20Fixture();
-//     this.contractAddress = await contract.getAddress();
-//     this.erc20 = contract;
-//     this.instances = await createInstances(this.signers);
-//   });
+  it("should successfully wrap tokens and allow transfer", async function () {
+    const wrapAmount = 100;
 
-//   it("should mint the contract", async function () {
-//     const transaction = await this.erc20.mint(1000);
-//     await transaction.wait();
+    // Set allowance for wrapping
+    const allowanceTx = await this.normalERC
+      .connect(this.signers.alice)
+      .approve(this.wrapperAddress, wrapAmount);  // Correct reference to wrapper address
+    await allowanceTx.wait();
 
-//     // Reencrypt Alice's balance
-//     const balanceHandleAlice = await this.erc20.balanceOf(this.signers.alice);
-//     const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-//     const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.contractAddress);
-//     const signatureAlice = await this.signers.alice.signTypedData(
-//       eip712.domain,
-//       { Reencrypt: eip712.types.Reencrypt },
-//       eip712.message,
-//     );
-//     const balanceAlice = await this.instances.alice.reencrypt(
-//       balanceHandleAlice,
-//       privateKeyAlice,
-//       publicKeyAlice,
-//       signatureAlice.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.alice.address,
-//     );
-//     expect(balanceAlice).to.equal(1000);
+    // Verify the allowance is set correctly
+    const allowance = await this.normalERC.allowance(this.signers.alice.address, this.wrapperAddress);  // Correct reference
+    expect(allowance).to.equal(wrapAmount);
 
-//     const totalSupply = await this.erc20.totalSupply();
-//     expect(totalSupply).to.equal(1000);
-//   });
+    // Call wrap function on the wrapper contract
+    const wrapTx = await this.wrapperContract.connect(this.signers.alice).wrap(wrapAmount);
+    await wrapTx.wait();
 
-//   it("should transfer tokens between two users", async function () {
-//     const transaction = await this.erc20.mint(10000);
-//     const t1 = await transaction.wait();
-//     expect(t1?.status).to.eq(1);
+   
+    const balance = await this.normalERC.balanceOf(this.signers.alice.address);  
+    expect(balance).to.equal(900);  
 
-//     const input = this.instances.alice.createEncryptedInput(this.contractAddress, this.signers.alice.address);
-//     input.add64(1337);
-//     const encryptedTransferAmount = input.encrypt();
-//     const tx = await this.erc20["transfer(address,bytes32,bytes)"](
-//       this.signers.bob.address,
-//       encryptedTransferAmount.handles[0],
-//       encryptedTransferAmount.inputProof,
-//     );
-//     const t2 = await tx.wait();
-//     expect(t2?.status).to.eq(1);
 
-//     // Reencrypt Alice's balance
-//     const balanceHandleAlice = await this.erc20.balanceOf(this.signers.alice);
-//     const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-//     const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.contractAddress);
-//     const signatureAlice = await this.signers.alice.signTypedData(
-//       eip712.domain,
-//       { Reencrypt: eip712.types.Reencrypt },
-//       eip712.message,
-//     );
-//     const balanceAlice = await this.instances.alice.reencrypt(
-//       balanceHandleAlice,
-//       privateKeyAlice,
-//       publicKeyAlice,
-//       signatureAlice.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.alice.address,
-//     );
 
-//     expect(balanceAlice).to.equal(10000 - 1337);
+    // Proceed with encrypted transfer logic
+    const input = this.instances.alice.createEncryptedInput(this.wrapperAddress, this.signers.alice.address);
+    input.add64(50);
+    const encryptedTransferAmount = input.encrypt();
 
-//     // Reencrypt Bob's balance
-//     const balanceHandleBob = await this.erc20.balanceOf(this.signers.bob);
+    const transferTx = await this.wrapperContract["transfer(address,bytes32,bytes)"](
+      this.signers.bob.address,  // Correct Bob's address
+      encryptedTransferAmount.handles[0],
+      encryptedTransferAmount.inputProof,
+    );
+    await transferTx.wait();
 
-//     const { publicKey: publicKeyBob, privateKey: privateKeyBob } = this.instances.bob.generateKeypair();
-//     const eip712Bob = this.instances.bob.createEIP712(publicKeyBob, this.contractAddress);
-//     const signatureBob = await this.signers.bob.signTypedData(
-//       eip712Bob.domain,
-//       { Reencrypt: eip712Bob.types.Reencrypt },
-//       eip712Bob.message,
-//     );
-//     const balanceBob = await this.instances.bob.reencrypt(
-//       balanceHandleBob,
-//       privateKeyBob,
-//       publicKeyBob,
-//       signatureBob.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.bob.address,
-//     );
+    // Reencrypt Alice's balance in the wrapper contract
+    const balanceHandleAlice = await this.wrapperContract.balanceOf(this.signers.alice.address); 
+    const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
+    
+    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.wrapperAddress);
+    const signatureAlice = await this.signers.alice.signTypedData(
+      eip712.domain,
+      { Reencrypt: eip712.types.Reencrypt },
+      eip712.message,
+    );
+    const balanceAlice = await this.instances.alice.reencrypt(
+      balanceHandleAlice,
+      privateKeyAlice,
+      publicKeyAlice,
+      signatureAlice.replace("0x", ""),
+      this.wrapperAddress, 
+      this.signers.alice.address, 
+    );
 
-//     expect(balanceBob).to.equal(1337);
-//   });
+    expect(balanceAlice).to.equal(50); 
+  });
 
-//   it("should not transfer tokens between two users", async function () {
-//     const transaction = await this.erc20.mint(1000);
-//     await transaction.wait();
+  it("should successfully unwrap tokens", async function () {
+  
+    const wrapAmount = 100;
 
-//     const input = this.instances.alice.createEncryptedInput(this.contractAddress, this.signers.alice.address);
-//     input.add64(1337);
-//     const encryptedTransferAmount = input.encrypt();
-//     const tx = await this.erc20["transfer(address,bytes32,bytes)"](
-//       this.signers.bob.address,
-//       encryptedTransferAmount.handles[0],
-//       encryptedTransferAmount.inputProof,
-//     );
-//     await tx.wait();
+    // Set allowance for wrapping
+    const allowanceTx = await this.normalERC
+      .connect(this.signers.alice)
+      .approve(this.wrapperAddress, wrapAmount);  // Correct reference to wrapper address
+    await allowanceTx.wait();
 
-//     const balanceHandleAlice = await this.erc20.balanceOf(this.signers.alice);
-//     const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-//     const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.contractAddress);
-//     const signatureAlice = await this.signers.alice.signTypedData(
-//       eip712.domain,
-//       { Reencrypt: eip712.types.Reencrypt },
-//       eip712.message,
-//     );
-//     const balanceAlice = await this.instances.alice.reencrypt(
-//       balanceHandleAlice,
-//       privateKeyAlice,
-//       publicKeyAlice,
-//       signatureAlice.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.alice.address,
-//     );
+    // Verify the allowance is set correctly
+    const allowance = await this.normalERC.allowance(this.signers.alice.address, this.wrapperAddress);  // Correct reference
+    expect(allowance).to.equal(wrapAmount);
 
-//     expect(balanceAlice).to.equal(1000);
+    // Call wrap function on the wrapper contract
+    const wrapTx = await this.wrapperContract.connect(this.signers.alice).wrap(wrapAmount);
+    await wrapTx.wait();
 
-//     // Reencrypt Bob's balance
-//     const balanceHandleBob = await this.erc20.balanceOf(this.signers.bob);
+   
+    const balance = await this.normalERC.balanceOf(this.signers.alice.address);  
+    expect(balance).to.equal(900);  
 
-//     const { publicKey: publicKeyBob, privateKey: privateKeyBob } = this.instances.bob.generateKeypair();
-//     const eip712Bob = this.instances.bob.createEIP712(publicKeyBob, this.contractAddress);
-//     const signatureBob = await this.signers.bob.signTypedData(
-//       eip712Bob.domain,
-//       { Reencrypt: eip712Bob.types.Reencrypt },
-//       eip712Bob.message,
-//     );
-//     const balanceBob = await this.instances.bob.reencrypt(
-//       balanceHandleBob,
-//       privateKeyBob,
-//       publicKeyBob,
-//       signatureBob.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.bob.address,
-//     );
 
-//     expect(balanceBob).to.equal(0);
-//   });
 
-//   it("should be able to transferFrom only if allowance is sufficient", async function () {
-//     const transaction = await this.erc20.mint(10000);
-//     await transaction.wait();
+    // Proceed with encrypted transfer logic
+    const input = this.instances.alice.createEncryptedInput(this.wrapperAddress, this.signers.alice.address);
+    input.add64(50);
+    const encryptedTransferAmount = input.encrypt();
 
-//     const inputAlice = this.instances.alice.createEncryptedInput(this.contractAddress, this.signers.alice.address);
-//     inputAlice.add64(1337);
-//     const encryptedAllowanceAmount = inputAlice.encrypt();
-//     const tx = await this.erc20["approve(address,bytes32,bytes)"](
-//       this.signers.bob.address,
-//       encryptedAllowanceAmount.handles[0],
-//       encryptedAllowanceAmount.inputProof,
-//     );
-//     await tx.wait();
+    const transferTx = await this.wrapperContract["transfer(address,bytes32,bytes)"](
+      this.signers.bob.address,  // Correct Bob's address
+      encryptedTransferAmount.handles[0],
+      encryptedTransferAmount.inputProof,
+    );
+    await transferTx.wait();
+    // ---------------- Unwrap---------------------
+    const unwrapTrx = await this.wrapperContract.connect(this.signers.alice).unwrap(20);
+    await unwrapTrx.wait();
+   const decrypt= await awaitAllDecryptionResults();
+    console.log(decrypt);
+    const newbalance = await this.normalERC.balanceOf(this.signers.alice.address);  
+    expect(newbalance).to.equal(920); 
 
-//     const bobErc20 = this.erc20.connect(this.signers.bob);
-//     const inputBob1 = this.instances.bob.createEncryptedInput(this.contractAddress, this.signers.bob.address);
-//     inputBob1.add64(1338); // above allowance so next tx should actually not send any token
-//     const encryptedTransferAmount = inputBob1.encrypt();
-//     const tx2 = await bobErc20["transferFrom(address,address,bytes32,bytes)"](
-//       this.signers.alice.address,
-//       this.signers.bob.address,
-//       encryptedTransferAmount.handles[0],
-//       encryptedTransferAmount.inputProof,
-//     );
-//     await tx2.wait();
+    
+    
 
-//     // Decrypt Alice's balance
-//     const balanceHandleAlice = await this.erc20.balanceOf(this.signers.alice);
-//     const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-//     const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.contractAddress);
-//     const signatureAlice = await this.signers.alice.signTypedData(
-//       eip712.domain,
-//       { Reencrypt: eip712.types.Reencrypt },
-//       eip712.message,
-//     );
-//     const balanceAlice = await this.instances.alice.reencrypt(
-//       balanceHandleAlice,
-//       privateKeyAlice,
-//       publicKeyAlice,
-//       signatureAlice.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.alice.address,
-//     );
-//     expect(balanceAlice).to.equal(10000); // check that transfer did not happen, as expected
+});
 
-//     // Decrypt Bob's balance
-//     const balanceHandleBob = await this.erc20.balanceOf(this.signers.bob);
-//     const { publicKey: publicKeyBob, privateKey: privateKeyBob } = this.instances.bob.generateKeypair();
-//     const eip712Bob = this.instances.bob.createEIP712(publicKeyBob, this.contractAddress);
-//     const signatureBob = await this.signers.bob.signTypedData(
-//       eip712Bob.domain,
-//       { Reencrypt: eip712Bob.types.Reencrypt },
-//       eip712Bob.message,
-//     );
-//     const balanceBob = await this.instances.bob.reencrypt(
-//       balanceHandleBob,
-//       privateKeyBob,
-//       publicKeyBob,
-//       signatureBob.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.bob.address,
-//     );
-//     expect(balanceBob).to.equal(0); // check that transfer did not happen, as expected
+});
 
-//     const inputBob2 = this.instances.bob.createEncryptedInput(this.contractAddress, this.signers.bob.address);
-//     inputBob2.add64(1337); // below allowance so next tx should send token
-//     const encryptedTransferAmount2 = inputBob2.encrypt();
-//     const tx3 = await bobErc20["transferFrom(address,address,bytes32,bytes)"](
-//       this.signers.alice.address,
-//       this.signers.bob.address,
-//       encryptedTransferAmount2.handles[0],
-//       encryptedTransferAmount2.inputProof,
-//     );
-//     await tx3.wait();
-
-//     // Decrypt Alice's balance
-//     const balanceHandleAlice2 = await this.erc20.balanceOf(this.signers.alice);
-//     const balanceAlice2 = await this.instances.alice.reencrypt(
-//       balanceHandleAlice2,
-//       privateKeyAlice,
-//       publicKeyAlice,
-//       signatureAlice.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.alice.address,
-//     );
-//     expect(balanceAlice2).to.equal(10000 - 1337); // check that transfer did happen this time
-
-//     // Decrypt Bob's balance
-//     const balanceHandleBob2 = await this.erc20.balanceOf(this.signers.bob);
-//     const balanceBob2 = await this.instances.bob.reencrypt(
-//       balanceHandleBob2,
-//       privateKeyBob,
-//       publicKeyBob,
-//       signatureBob.replace("0x", ""),
-//       this.contractAddress,
-//       this.signers.bob.address,
-//     );
-//     expect(balanceBob2).to.equal(1337); // check that transfer did happen this time*/
-//   });
-// });
