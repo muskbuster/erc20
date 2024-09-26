@@ -33,7 +33,7 @@ contract ConfidentialERC20Wrapper is EncryptedERC20, GatewayCaller {
         uint256 allowance = baseERC20.allowance(msg.sender, address(this));
         require(allowance >= _amount, "Not enough allowance");
         baseERC20.transferFrom(msg.sender, address(this),_amount);
-        mint(msg.sender, uint64(amount));
+        _mint(msg.sender, uint64(amount));
         emit Wrap(msg.sender, amount);
     }
 
