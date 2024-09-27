@@ -118,7 +118,25 @@ it("Should not change balance of Bob or Alice if Bob is blacklisted", async func
     encryptedTransferAmount.handles[0],
     encryptedTransferAmount.inputProof,
   );
-
+  await tx.wait();
+  const balanceHandleAlice = await this.erc20.balanceOf(this.signers.alice);
+  const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
+  const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.contractAddress);
+  const signatureAlice = await this.signers.alice.signTypedData(
+    eip712.domain,
+    { Reencrypt: eip712.types.Reencrypt },
+    eip712.message,
+  );
+  const balanceAlice = await this.instances.alice.reencrypt(
+    balanceHandleAlice,
+    privateKeyAlice,
+    publicKeyAlice,
+    signatureAlice.replace("0x", ""),
+    this.contractAddress,
+    this.signers.alice.address,
+  );
+  //balance should not change as bob is blacklisted
+  expect(balanceAlice).to.equal(1000);
 });
 
 
