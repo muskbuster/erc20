@@ -35,7 +35,7 @@ function transfer(address to, euint64 amount) public override returns (bool) {
 
     ebool hasEnough = TFHE.le(amount, balances[msg.sender]);
     euint64 transferAmount = TFHE.select(hasEnough, amount, TFHE.asEuint64(0));
-
+    TFHE.allow(transferAmount,address(transferRulesContract));
     // Apply transfer rules
     ebool rulesPassed = transferRulesContract.transfer(msg.sender, to, transferAmount);
     transferAmount = TFHE.select(rulesPassed, transferAmount, TFHE.asEuint64(0));

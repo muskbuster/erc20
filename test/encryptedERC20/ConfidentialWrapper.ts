@@ -4,8 +4,6 @@ import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
 import { deployEncryptedERC20Fixture } from "./ConfidentialWrapper.fixture";
 import { awaitAllDecryptionResults } from "../asyncDecrypt";
-import { erc20 } from "../../types/@openzeppelin/contracts/token";
-import { decrypt } from "dotenv";
 describe("ConfidentialERC20Wrapper - Wrap Functionality", function () {
   before(async function () {
     await initSigners();

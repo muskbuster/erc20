@@ -31,35 +31,39 @@ contract TransferRules is Ownable2Step {
     function transfer(address from, address to, euint64 amount) public  returns (ebool) {
         // Condition 1: Check that addresses are not blacklisted
         if (userBlocklist[from] || userBlocklist[to]) {
-            revert AddressBlacklisted(userBlocklist[from] ? from : to);
-        }
+            ebool transferable= TFHE.asEbool(false);
+            TFHE.allow(transferable,address(this));
+            TFHE.allow(transferable, msg.sender);
+            return transferable;
 
-    
+        }
         ebool sameCountry = identityContract.checkSameCountry(from, to);
        TFHE.allow(sameCountry,address(this));
         // Condition 3: If not from the same country, check if the amount is below the transfer limit
-      //  ebool belowLimit = TFHE.le(amount, TRANSFER_LIMIT);
-       // TFHE.allow(belowLimit,address(this));
-        // Final condition: (same country OR (different country AND below limit))
-       ebool transferAllowed = sameCountry;//TFHE.or(sameCountry, TFHE.and(TFHE.not(sameCountry), belowLimit));
+      ebool belowLimit = TFHE.le(amount,20000000000);
+       TFHE.allow(belowLimit,address(this));
+       ebool notSameCountry = TFHE.not(sameCountry);
+       TFHE.allow(notSameCountry,address(this));
+       ebool transferAllowed = TFHE.or(sameCountry, TFHE.and(notSameCountry, belowLimit));
 
-        // If transfer is allowed, return the original amount, otherwise return 0
+       
         // euint64 result = TFHE.select(transferAllowed, amount, TFHE.asEuint64(0));
-
-        // Allow this contract to access the result
         TFHE.allow(transferAllowed,address(this));
-
-        // Allow the caller (likely the token contract) to access the result
         TFHE.allow(transferAllowed, msg.sender);
 
         return transferAllowed;
     }
+
+
+
+
+
     function mint(address to, euint64 amount) public returns (ebool) {
         // Condition 1: Check if the user is blacklisted
         if (userBlocklist[to]) {
             revert AddressBlacklisted(to);
         }
-        ebool belowMintLimit = TFHE.le(amount, TRANSFER_LIMIT); // You could define a separate mint limit if necessary
+        ebool belowMintLimit = TFHE.le(amount, TRANSFER_LIMIT); 
 
 
         ebool mintAllowed = TFHE.and(TFHE.asEbool(true), belowMintLimit); 
