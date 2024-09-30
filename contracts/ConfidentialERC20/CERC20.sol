@@ -5,9 +5,8 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "./Utils/IERC20.sol";
 import {IERC20Metadata} from "./Utils/IERC20Metadata.sol";
-import {Context} from "./Utils/Context.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Errors} from "./Utils/IERC6093.sol";
-
 import "fhevm/lib/TFHE.sol";
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -27,12 +26,12 @@ import "fhevm/lib/TFHE.sol";
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
  */
-abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
-    mapping(address account => euint64) private _balances;
+abstract contract CERC20 is Ownable, IERC20, IERC20Metadata, IERC20Errors {
+    mapping(address account => euint64) public _balances;
 
     mapping(address account => mapping(address spender => euint64)) internal _allowances;
 
-    uint64 private _totalSupply;
+    uint64 public _totalSupply;
 
     string private _name;
     string private _symbol;
@@ -43,7 +42,7 @@ abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_) {
+    constructor(string memory name_, string memory symbol_) Ownable(msg.sender){
         _name = name_;
         _symbol = symbol_;
     }

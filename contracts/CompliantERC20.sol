@@ -2,66 +2,87 @@
 pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
-import "./ConfidentialERC20.sol";
+import {ConfidentialToken} from "./ConfidentialERC20/ExampleERC20.sol";
 import "./Identity.sol";
 import "./TransferRules.sol";
-contract CompliantConfidentialERC20 is ConfidentialERC20 {
+
+
+contract CompliantConfidentialERC20 is ConfidentialToken {
     Identity public identityContract;
     TransferRules public transferRulesContract;
 
-    constructor(string memory name_, string memory symbol_, address _identityContract, address _transferRulesContract) 
-    ConfidentialERC20(name_, symbol_) 
+    constructor(
+        string memory name_, 
+        string memory symbol_, 
+        address _identityContract, 
+        address _transferRulesContract
+    ) 
+    ConfidentialToken(name_, symbol_) 
     {
-       address owner = msg.sender;
         identityContract = Identity(_identityContract);
         transferRulesContract = TransferRules(_transferRulesContract);
     }
 
-    
-
-
-
     // Overridden transfer function handling encrypted inputs
-    function transfer(address to, einput encryptedAmount, bytes calldata inputProof) 
-    public virtual override returns (bool) {
+    function transfer(
+        address to, 
+        einput encryptedAmount, 
+        bytes calldata inputProof
+    ) 
+        public 
+        virtual 
+        override 
+        returns (bool) 
+    {
         euint64 amount = TFHE.asEuint64(encryptedAmount, inputProof);
         return transfer(to, amount);
     }
-    
+
     // Internal transfer function applying the transfer rules
-// Fix visibility to match the base contract's function
-function transfer(address to, euint64 amount) public override returns (bool) {
-    require(TFHE.isSenderAllowed(amount), "Sender not allowed");
+    function transfer(
+        address to, 
+        euint64 amount
+    ) 
+        public 
+        override 
+        returns (bool) 
+    {
+        require(TFHE.isSenderAllowed(amount), "Sender not allowed");
 
-    ebool hasEnough = TFHE.le(amount, balances[msg.sender]);
-    euint64 transferAmount = TFHE.select(hasEnough, amount, TFHE.asEuint64(0));
-    TFHE.allow(transferAmount,address(transferRulesContract));
-    // Apply transfer rules
-    ebool rulesPassed = transferRulesContract.transfer(msg.sender, to, transferAmount);
-    transferAmount = TFHE.select(rulesPassed, transferAmount, TFHE.asEuint64(0));
-    TFHE.allow(transferAmount,address(this));
-    _transfer(msg.sender, to, transferAmount);
-    return true;
-}
+        ebool hasEnough = TFHE.le(amount, _balances[msg.sender]);
+        euint64 transferAmount = TFHE.select(hasEnough, amount, TFHE.asEuint64(0));
+        
+        // Apply transfer rules
+        TFHE.allow(transferAmount, address(transferRulesContract));
+        ebool rulesPassed = transferRulesContract.transfer(msg.sender, to, transferAmount);
+        transferAmount = TFHE.select(rulesPassed, transferAmount, TFHE.asEuint64(0));
 
+        TFHE.allow(transferAmount, address(this));
+        _transfer(msg.sender, to, transferAmount);
+        
+        return true;
+    }
 
-    // Internal transfer function with transfer rules and encrypted balances
-    function _transfer(address from, address to, euint64 _amount) internal  {
-        euint64 newBalanceFrom = TFHE.sub(balances[from], _amount);
-        balances[from] = newBalanceFrom;
+    // Internal transfer function with encrypted balances
+    function _transfer(
+        address from, 
+        address to, 
+        euint64 _amount
+    ) 
+        internal 
+    {
+        euint64 newBalanceFrom = TFHE.sub(_balances[from], _amount);
+        _balances[from] = newBalanceFrom;
         TFHE.allow(newBalanceFrom, from);
 
-        euint64 newBalanceTo = TFHE.add(balances[to], _amount);
-        balances[to] = newBalanceTo;
+        euint64 newBalanceTo = TFHE.add(_balances[to], _amount);
+        _balances[to] = newBalanceTo;
         TFHE.allow(newBalanceTo, address(this));
         TFHE.allow(newBalanceTo, to);
-
-        emit Transfer(from, to);
     }
 
     // Allows admin to view any user's encrypted balance
-    function adminViewUserBalance(address user) public onlyOwner {
-        TFHE.allow(balances[user], owner());
+    function adminViewUserBalance(address user) onlyOwner() public  {
+        TFHE.allow(_balances[user], owner());
     }
-
 }

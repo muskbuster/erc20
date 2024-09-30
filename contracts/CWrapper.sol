@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
 import "fhevm/gateway/GatewayCaller.sol";
-import "contracts/ConfidentialERC20.sol";
+import {ConfidentialToken} from "./ConfidentialERC20/ExampleERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract ConfidentialERC20Wrapper is ConfidentialERC20, GatewayCaller {
+contract ConfidentialERC20Wrapper is ConfidentialToken, GatewayCaller {
     IERC20 public baseERC20;
     mapping(address => bool) public unwrapDisabled;
     mapping(uint256 => BurnRequest) public burnRequests;
@@ -23,7 +23,7 @@ contract ConfidentialERC20Wrapper is ConfidentialERC20, GatewayCaller {
 
     error UnwrapNotAllowed(address account);
 
-    constructor(address _baseERC20) ConfidentialERC20("Wrapped cERC20", "wcERC20") {
+    constructor(address _baseERC20) ConfidentialToken("Wrapped cERC20", "wcERC20") {
         baseERC20 = IERC20(_baseERC20);
     }
 
@@ -46,7 +46,7 @@ contract ConfidentialERC20Wrapper is ConfidentialERC20, GatewayCaller {
 
     function _requestBurn(address account, uint64 amount) internal {
         //_checkNotZeroAddress(account);
-        ebool enoughBalance = TFHE.le(amount, balances[account]);
+        ebool enoughBalance = TFHE.le(amount, _balances[account]);
         TFHE.allow(enoughBalance, address(this));
         uint256[] memory cts = new uint256[](1);
         cts[0] = Gateway.toUint256(enoughBalance);
@@ -71,9 +71,9 @@ contract ConfidentialERC20Wrapper is ConfidentialERC20, GatewayCaller {
             revert("Decryption failed");
         }
         _totalSupply=_totalSupply-amount;
-        balances[account] = TFHE.sub(balances[account], amount);
-        TFHE.allow(balances[account], address(this));
-        TFHE.allow(balances[account], account);
+        _balances[account] = TFHE.sub(_balances[account], amount);
+        TFHE.allow(_balances[account], address(this));
+        TFHE.allow(_balances[account], account);
         emit Burn(account, amount);
 
         baseERC20.transfer(account, amount);

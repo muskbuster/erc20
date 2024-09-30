@@ -7,13 +7,13 @@ import "fhevm/lib/TFHE.sol";
 /**
  * @dev Implementation of the {IncoERC20} contract, providing minting and additional functionality.
  */
-contract ConfidentialToken is IncoERC20 {
+contract ConfidentialToken is CERC20 {
     address private _owner;
 
     /**
      * @dev Sets the initial values for {name} and {symbol}, and assigns ownership to the deployer.
      */
-    constructor(string memory name_, string memory symbol_) IncoERC20(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_) CERC20(name_, symbol_) {
         _owner = msg.sender;
     }
 
@@ -39,7 +39,7 @@ contract ConfidentialToken is IncoERC20 {
      * @dev Change the owner
      *
      */
-    function transferOwnership(address newOwner) public {
+    function transferOwnership(address newOwner) public override{
         require(msg.sender == _owner, " Only owner");
         _owner = newOwner;
     }
@@ -47,7 +47,7 @@ contract ConfidentialToken is IncoERC20 {
     /**
      * @dev Get the owner of the contract.
      */
-    function owner() public view returns (address) {
+    function owner() public view override returns (address) {
         return _owner;
     }
 }
