@@ -30,7 +30,7 @@ import "fhevm/lib/TFHE.sol";
 abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
     mapping(address account => euint64) private _balances;
 
-    mapping(address account => mapping(address spender => euint64)) public _allowances;
+    mapping(address account => mapping(address spender => euint64)) internal _allowances;
 
     uint64 private _totalSupply;
 
@@ -90,7 +90,7 @@ abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account) public virtual returns (euint64) {
+    function balanceOf(address account) public view virtual returns (euint64) {
         return _balances[account];
     }
 
@@ -119,7 +119,7 @@ abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public  virtual returns (euint64) {
+    function allowance(address owner, address spender) public view virtual returns (euint64) {
         return _allowances[owner][spender];
     }
 
@@ -227,7 +227,7 @@ abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        _balances[account] = TFHE.add(_balances[account], value); // overflow impossible because of next line
+        _balances[account] = TFHE.add(_balances[account], value); 
         TFHE.allow(_balances[account], address(this));
         TFHE.allow(_balances[account],msg.sender);
         _totalSupply+=value;
@@ -314,9 +314,9 @@ abstract contract IncoERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
      */
     function _updateAllowance(address owner, address spender, euint64 amount) internal virtual returns (ebool) {
         euint64 currentAllowance = _allowances[owner][spender];
-        // makes sure the allowance suffices
+
         ebool allowedTransfer = TFHE.le(amount, currentAllowance);
-        // makes sure the owner has enough tokens
+        
         ebool canTransfer = TFHE.le(amount, _balances[owner]);
         ebool isTransferable = TFHE.and(canTransfer, allowedTransfer);
         _approve(owner, spender, TFHE.select(isTransferable, TFHE.sub(currentAllowance, amount), currentAllowance));
