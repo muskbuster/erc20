@@ -7,7 +7,7 @@ import {ConfidentialToken} from "./ConfidentialERC20/ExampleERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract ConfidentialERC20Wrapper is ConfidentialToken, GatewayCaller {
+contract ConfidentialERC20Wrapper is ConfidentialToken {
     IERC20 public baseERC20;
     mapping(address => bool) public unwrapDisabled;
     mapping(uint256 => BurnRequest) public burnRequests;
@@ -44,42 +44,26 @@ contract ConfidentialERC20Wrapper is ConfidentialToken, GatewayCaller {
         _requestBurn(msg.sender, uint64(amount));
     }
 
-    function _requestBurn(address account, uint64 amount) internal {
-        //_checkNotZeroAddress(account);
-        ebool enoughBalance = TFHE.le(amount, _balances[account]);
-        TFHE.allow(enoughBalance, address(this));
-        uint256[] memory cts = new uint256[](1);
-        cts[0] = Gateway.toUint256(enoughBalance);
-        // Store burn request
-        uint256 requestID = Gateway.requestDecryption(
-            cts,
-            this._burnCallback.selector,
-            0,
-            block.timestamp + 100,
-            false
-        );
 
-        burnRequests[requestID] = BurnRequest(account, amount);
+function _burnCallback(uint256 requestID, bool decryptedInput) public virtual override onlyGateway {
+    BurnRq memory burnRequest = burnRqs[requestID];
+    address account = burnRequest.account;
+    uint64 amount = burnRequest.amount;
+
+    if (!decryptedInput) {
+        revert("Decryption failed");
     }
 
-    function _burnCallback(uint256 requestID, bool decryptedInput) public onlyGateway {
-        BurnRequest memory burnRequest = burnRequests[requestID];
-        address account = burnRequest.account;
-        uint64 amount = burnRequest.amount;
+    // Call base ERC20 transfer and emit Unwrap event
+    baseERC20.transfer(account, amount);
+    emit Unwrap(account, amount);
 
-        if (!decryptedInput) {
-            revert("Decryption failed");
-        }
-        _totalSupply=_totalSupply-amount;
-        _balances[account] = TFHE.sub(_balances[account], amount);
-        TFHE.allow(_balances[account], address(this));
-        TFHE.allow(_balances[account], account);
-        emit Burn(account, amount);
+    // Continue with the burn logic
+    _totalSupply -= amount;
+    _balances[account] = TFHE.sub(_balances[account], amount);
+    TFHE.allow(_balances[account], address(this));
+    TFHE.allow(_balances[account], account);
+    delete burnRqs[requestID];
+}
 
-        baseERC20.transfer(account, amount);
-        emit Unwrap(account, amount);
-
-        // Clean up the burn request after handling it
-        delete burnRequests[requestID];
-    }
 }
