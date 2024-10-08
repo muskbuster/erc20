@@ -232,23 +232,6 @@ abstract contract CERC20 is Ownable, IERC20, IERC20Metadata, IERC20Errors {
         _totalSupply+=value;
     }
 
-    /**
-     * @dev Destroys a `value` amount of tokens from `account`, lowering the total supply.
-     * Relies on the `_update` mechanism.
-     *
-     * Emits a {Transfer} event with `to` set to the zero address.
-     *
-     * NOTE: This function is not virtual, {_update} should be overridden instead
-     */
-    function _burn(address account, uint64 value) internal {
-        if (account == address(0)) {
-            revert ERC20InvalidSender(address(0));
-        }
-        _balances[account] = TFHE.sub(_balances[account], value); // overflow impossible because of next line
-        TFHE.allow(_balances[account], address(this));
-        TFHE.allow(_balances[account],msg.sender);
-        _totalSupply-=value;
-    }
 
     /**
      * @dev Sets `value` as the allowance of `spender` over the `owner` s tokens.
