@@ -3,19 +3,19 @@ pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
 import "fhevm/gateway/GatewayCaller.sol";
-import {ConfidentialToken} from "./ConfidentialERC20/ExampleERC20.sol";
+import {ConfidentialToken} from "./ConfidentialERC20/ConfidentialToken.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ConfidentialERC20Wrapper is ConfidentialToken {
     IERC20 public baseERC20;
     mapping(address => bool) public unwrapDisabled;
-    mapping(uint256 => BurnRequest) public burnRequests;
-    uint256 counter;
-    struct BurnRequest {
-        address account;
-        uint64 amount;
-    }
+    // mapping(uint256 => BurnRequest) public burnRequests;
+    // uint256 counter;
+    // struct BurnRequest {
+    //     address account;
+    //     uint64 amount;
+    // }
 
     event Wrap(address indexed account, uint64 amount);
     event Unwrap(address indexed account, uint64 amount);
